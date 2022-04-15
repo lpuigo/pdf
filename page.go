@@ -697,7 +697,7 @@ func (p Page) GetTextByRow() (Rows, error) {
 	p.walkTextBlocks(showText)
 
 	for _, row := range result {
-		sort.Sort(row.Content)
+		sort.Stable(row.Content)
 	}
 
 	sort.Slice(result, func(i, j int) bool {
@@ -777,7 +777,9 @@ func (p Page) walkTextBlocks(walker func(enc TextEncoding, x, y float64, s strin
 }
 
 // Content returns the page's content.
-func (p Page) Content() Content {
+func (p Page) Content() (Content, error) {
+	var err error
+
 	strm := p.V.Key("Contents")
 	var enc TextEncoding = &nopEncoder{}
 
@@ -813,6 +815,15 @@ func (p Page) Content() Content {
 
 	var rect []Rect
 	var gstack []gstate
+
+	defer func() {
+		if r := recover(); r != nil {
+			text = []Text{}
+			rect = []Rect{}
+			err = errors.New(fmt.Sprint(r))
+		}
+	}()
+
 	Interpret(strm, func(stk *Stack, op string) {
 		n := stk.Len()
 		args := make([]Value, n)
@@ -995,7 +1006,7 @@ func (p Page) Content() Content {
 			g.Th = args[0].Float64() / 100
 		}
 	})
-	return Content{text, rect}
+	return Content{text, rect}, err
 }
 
 // TextVertical implements sort.Interface for sorting
